@@ -1,164 +1,175 @@
 ---
 name: gost
-description: Оформит документ по ГОСТ с нуля или проверит готовый и укажет на каждую ошибку со ссылкой на пункт стандарта — диссертация и автореферат, ВКР и диплом, отчёт о НИР, статья, реферат и аннотация, деловой документ, презентация защиты, библиография, единицы измерения. Экономит недели правок и защищает от возврата работы на доработку. Use whenever the user mentions ГОСТ, оформление или проверку документа, титульный лист, список литературы, диссертацию, автореферат, научный доклад, ВКР, диплом, реферат, курсовую, статью, отчёт, единицы измерения — even when the standard is not named.
+description: Formats a document to ГОСТ (Russian state standard) from scratch, or reviews a finished one and flags every error with a reference to the standard's clause — dissertation and avtoreferat, thesis (ВКР) and diploma, research report, journal article, abstract and annotation, official/business document, defense presentation, bibliography, units of measurement. Saves weeks of revisions and guards against the work being sent back for rework. Use whenever the user mentions ГОСТ, оформление or проверку document, титульный лист, список литературы, диссертацию, автореферат, научный доклад, ВКР, диплом, реферат, курсовую, статью, отчёт, единицы измерения — even when the standard is not named.
 ---
 
-# Документы по ГОСТ: маршрутизатор и общий слой
+# GOST documents: router and shared layer
 
-Один скилл на все документы по ГОСТ. Он сам определяет тип документа,
-подключает нужный модуль и держит общий слой вёрстки, единиц и библиографии,
-одинаковый для всех типов. Работа ведётся в одном из двух режимов: собрать
-новый документ по стандарту или принять готовый документ отчётом, в котором
-каждое замечание имеет ссылку на пункт стандарта или методички.
+One skill for all ГОСТ-governed documents. It determines the document type
+itself, loads the matching module, and maintains the shared layer for
+layout, units, and bibliography — the same across all document types. Work
+proceeds in one of two modes: assemble a new document to the standard, or
+accept a finished document with an audit report in which every remark
+carries a reference to the standard's or guideline's clause.
 
-Приоритет требований: сначала требования образовательной организации, кафедры,
-программы ГИА или редакции для конкретного документа, затем действующие
-национальные стандарты в пределах их области применения, затем модули этого
-скилла как нормализованная рабочая интерпретация стандартов, затем общие
-редакционные рекомендации — только там, где пункты выше оставляют выбор.
-Конфликт требований фиксируется с обеими ссылками; применяется источник более
-высокого приоритета.
+Requirement priority: first, the requirements of the educational
+institution, department, degree program, or edition for the specific
+document; then the currently effective national standards within their
+scope; then this skill's modules as a normalized working interpretation of
+the standards; then general editorial recommendations — only where the
+levels above leave a choice. A conflict between requirements is recorded
+with both references; the higher-priority source applies.
 
-## Шаг 1. Тип документа и что читать
+## Step 1. Document type and what to read
 
-| Документ или задача | Модуль |
+| Document or task | Module |
 | --- | --- |
-| Диссертация, автореферат, научный доклад (ГОСТ Р 7.0.11-2011) | `references/dissertation.md`: порядок работы, полные чек-листы и reference-файлы в `references/dissertation/`, приёмочный скрипт `scripts/gost_acceptance.py` |
-| ВКР, дипломный и магистерский проект | `references/vkr.md` |
-| Отчёт о НИР; профиль оформления, когда методичка ссылается на ГОСТ 7.32 | `references/nir-report-7.32.md` |
-| Текстовый документ ЕСКД: пояснительная записка, конструкторская документация | `references/text-documents-2.105.md` |
-| Статья в журнале или сборнике (ГОСТ Р 7.0.7-2021) | `references/journal-article-7.0.7.md` |
-| Реферат и аннотация как вторичный научный документ (ГОСТ Р 7.0.99-2018) | `references/abstract-referat-7.0.99.md` |
-| Заявление, служебная записка, справка, акт, протокол (ГОСТ Р 7.0.97-2025) | `references/official-documents-7.0.97.md` |
-| Презентация и доклад на защите ВКР или научной работы | `references/defense-presentation.md` |
-| Библиографические ссылки: внутритекстовые, подстрочные, затекстовые | `references/references-7.0.5.md` |
-| Записи списка литературы (ГОСТ Р 7.0.100-2018) | `references/bibliography-records-7.0.100.md` |
-| Ссылки на сетевые документы: сайты, статьи онлайн, репозитории, датасеты | `references/web-references-7.0.108.md` |
-| Числа и единицы величин в любом документе (ГОСТ 8.417-2024) | `references/units-8.417.md` |
+| Dissertation, avtoreferat, scientific report (ГОСТ Р 7.0.11-2011) | `references/dissertation.md`: workflow, full checklists, and reference files in `references/dissertation/`, acceptance script `scripts/gost_acceptance.py` |
+| ВКР (thesis), diploma and master's project | `references/vkr.md` |
+| Research report (НИР); layout profile when the guideline references ГОСТ 7.32 | `references/nir-report-7.32.md` |
+| ЕСКД text document: explanatory note, design documentation | `references/text-documents-2.105.md` |
+| Journal or proceedings article (ГОСТ Р 7.0.7-2021) | `references/journal-article-7.0.7.md` |
+| Abstract and annotation as a secondary scientific document (ГОСТ Р 7.0.99-2018) | `references/abstract-referat-7.0.99.md` |
+| Application, memo, certificate, act, minutes (ГОСТ Р 7.0.97-2025) | `references/official-documents-7.0.97.md` |
+| Presentation and talk for a thesis or research defense | `references/defense-presentation.md` |
+| Bibliographic references: in-text, footnote, end-of-text | `references/references-7.0.5.md` |
+| Bibliography entries (ГОСТ Р 7.0.100-2018) | `references/bibliography-records-7.0.100.md` |
+| References to online sources: websites, online articles, repositories, datasets | `references/web-references-7.0.108.md` |
+| Numbers and units of measurement in any document (ГОСТ 8.417-2024) | `references/units-8.417.md` |
 
-Модуль типа держит то, чего нет в общем слое: структуру документа, титульный
-лист по образцу организации, частные кегли, границы области действия
-стандарта. Модули комбинируются. Работа над ВКР собирается так: `vkr.md` как
-основа, профиль оформления из `nir-report-7.32.md`, реферат по
-`abstract-referat-7.0.99.md`, библиографическая тройка и `units-8.417.md`
-поверх, перед защитой — `defense-presentation.md`. Журнальная статья —
-`journal-article-7.0.7.md` плюс та же библиографическая тройка.
+A type module holds what the shared layer doesn't: document structure, the
+institution's title-page template, type-specific font sizes, the boundaries
+of the standard's scope. Modules combine. A ВКР (thesis) is assembled as:
+`vkr.md` as the base, the layout profile from `nir-report-7.32.md`, the
+abstract per `abstract-referat-7.0.99.md`, the bibliography trio plus
+`units-8.417.md` on top, and `defense-presentation.md` before the defense. A
+journal article is `journal-article-7.0.7.md` plus the same bibliography
+trio.
 
-Курсовая, учебный реферат с планом, отчёт по практике, тезисы конференции,
-монография и служебные документы ГИА (отзыв, рецензия, акт внедрения)
-отдельного модуля пока не имеют. Частично их закрывают `vkr.md` и
-`nir-report-7.32.md`; полный модуль создаётся протоколом расширения, и частный
-пункт без источника получает NEEDS_SOURCE_CHECK.
+Term papers (курсовая), coursework abstracts with an outline, internship
+reports, conference abstracts, monographs, and degree-committee service
+documents (review, appraisal, implementation act) don't have a dedicated
+module yet. `vkr.md` and `nir-report-7.32.md` partially cover them; a full
+module is created via the extension protocol below, and any specific point
+without a source gets NEEDS_SOURCE_CHECK.
 
-## Шаг 2. Общий слой вёрстки DOCX
+## Step 2. Shared DOCX layout layer
 
-Механическая проверка читает `document.xml` распакованного пакета и не изменяет
-файл. Для распаковки подключай скилл `docx`. Твип — 1/1440 дюйма; кегль в
-`w:sz` хранится в полупунктах.
+The mechanical check reads `document.xml` from the unpacked package and does
+not modify the file. Use the `docx` skill to unpack. A twip is 1/1440 inch;
+font size in `w:sz` is stored in half-points.
 
-Значения полей, кегля и положения номера страницы у стандартов расходятся,
-поэтому общий слой держит два профиля. Значения берутся из модуля типа
-документа; пока модуля нет, частный пункт получает NEEDS_SOURCE_CHECK.
+Standards disagree on margin values, font size, and page-number placement,
+so the shared layer maintains two profiles. Values come from the
+document-type module; where no module exists yet, the specific point gets
+NEEDS_SOURCE_CHECK.
 
-| Требование | Профиль ГОСТ Р 7.0.11 (диссертация) | Профиль ГОСТ 7.32 / ВКР |
+| Requirement | ГОСТ Р 7.0.11 profile (dissertation) | ГОСТ 7.32 / ВКР profile |
 | --- | --- | --- |
-| Поля мм: левое/правое/верхнее/нижнее | 25/10/20/20 — `w:pgMar` 1417/567/1134/1134 | 30/15/20/20 — `w:pgMar` 1701/850/1134/1134 |
-| Номер страницы | посередине верхнего поля | нижний колонтитул; сам 7.32 позицию не фиксирует, позицию задаёт локальный шаблон |
-| Кегль | 12–14 пт — `w:sz` и `w:szCs` от 24 до 28 | не менее 12 пт — `w:sz` от 24; 14 пт — безопасный профиль ВКР |
-| Межстрочный интервал 1,5 | `w:spacing w:line="360" w:lineRule="auto"` | то же |
-| Абзацный отступ 1,25 см | `w:ind w:firstLine="709"`, одинаков по тексту | то же |
-| Лист А4 210 × 297 мм | `w:pgSz w:w="11906" w:h="16838"` | то же; крупные таблицы отчёта — А3 |
+| Margins mm: left/right/top/bottom | 25/10/20/20 — `w:pgMar` 1417/567/1134/1134 | 30/15/20/20 — `w:pgMar` 1701/850/1134/1134 |
+| Page number | centered in top margin | footer; ГОСТ 7.32 itself doesn't fix the position — the local template sets it |
+| Font size | 12–14 pt — `w:sz`/`w:szCs` 24 to 28 | at least 12 pt — `w:sz` from 24; 14 pt is the safe ВКР profile |
+| 1.5 line spacing | `w:spacing w:line="360" w:lineRule="auto"` | same |
+| 1.25 cm first-line indent | `w:ind w:firstLine="709"`, consistent throughout | same |
+| A4 sheet 210 × 297 mm | `w:pgSz w:w="11906" w:h="16838"` | same; large report tables use A3 |
 
-Общие для обоих профилей правила: заголовки — явным шрифтом без темевой
-подмены, в стилях Heading удаляй `w:asciiTheme`, `w:hAnsiTheme`, `w:cstheme`,
-`w:eastAsiaTheme`, потому что темевой атрибут сильнее явного шрифта и
-возвращает Calibri Light; оглавление — автособранным полем
-`TOC \o "1-2" \h \z \u` с `w:updateFields w:val="true"` в settings.xml;
-подписи по ГОСТ 2.105 — «Таблица N — Название» над таблицей слева, «Рисунок N —
-Название» под рисунком по центру, текст ячеек компактно без абзацного отступа,
-табуляторы в тексте — мусор копирования, заменяй пробелом; метаданные без
-следов автоматизации — в `dc:creator` и `cp:lastModifiedBy` нет упоминаний
-генераторов, в app.xml `Application` = Microsoft Office Word, миниатюры
-`docProps/thumbnail.jpeg` в пакете нет.
+Rules common to both profiles: headings use an explicit font with no theme
+override — remove `w:asciiTheme`, `w:hAnsiTheme`, `w:cstheme`,
+`w:eastAsiaTheme` from Heading styles, because a theme attribute overrides
+an explicit font and reverts to Calibri Light; the table of contents is an
+auto-generated field `TOC \o "1-2" \h \z \u` with `w:updateFields
+w:val="true"` in settings.xml; captions per ГОСТ 2.105 read "Таблица N —
+Название" above the table, left-aligned, and "Рисунок N — Название" below
+the figure, centered; cell text is set compactly with no first-line indent;
+tab characters in text are copy-paste debris — replace with a space;
+metadata carries no trace of automation — `dc:creator` and
+`cp:lastModifiedBy` mention no generators, `Application` in app.xml is
+Microsoft Office Word, and `docProps/thumbnail.jpeg` is absent from the
+package.
 
-Диссертация, на которой скилл выверялся, сознательно расходится с текстом
-ГОСТ Р 7.0.11 в двух местах: поля 30/15 вместо 25/10 и номер страницы внизу
-вместо верха. Оба значения совпадают с профилем ГОСТ 7.32; в отчёте приёмки
-расхождения помечаются отдельно, без отказа. При проверке стороннего документа
-применяй точные значения его профиля.
+The dissertation this skill was calibrated against intentionally diverges
+from the ГОСТ Р 7.0.11 text in two places: 30/15 margins instead of 25/10,
+and the page number at the bottom instead of the top. Both values match the
+ГОСТ 7.32 profile; the acceptance report flags these divergences
+separately, without failing the check. When reviewing a third-party
+document, apply that document's exact profile values.
 
-## Формулы — OMML
+## Formulas — OMML
 
-Каждая формула любого документа — объект Office Math: строчная запись —
-`m:oMath`, выключная — `m:oMathPara`. Растр, EMF, поле EQ, объект MathType и
-текстовый набор не проходят. Объекты с индексами собираются структурами
-`m:sSub`/`m:sSup`, а не слипшимся текстом. Одиночная переменная в тексте не
-формула; выражение с операцией или отношением — формула. Исходники формул
-хранятся в `FORMULA_SOURCES.json`; полная спецификация вёрстки формульной
-строки и проверки геометрии — в `references/dissertation/07-formulas.md`.
+Every formula in any document is an Office Math object: inline is
+`m:oMath`, display is `m:oMathPara`. Raster images, EMF, EQ fields,
+MathType objects, and plain-text formulas don't pass. Objects with indices
+are built with `m:sSub`/`m:sSup` structures, not glued-together text. A
+single variable in running text is not a formula; an expression with an
+operation or relation is. Formula sources are stored in
+`FORMULA_SOURCES.json`; the full formula-line layout and geometry-check
+spec is in `references/dissertation/07-formulas.md`.
 
-Модули добавляют к механике пунктуацию: по ГОСТ 7.32 пояснения даются
-непосредственно после формулы, слово «где» пишется без двоеточия, номер — в
-круглых скобках справа в записи вида `(3.1)` или `(В.1)`, при переносе формулы
-знак повторяется в начале новой строки. Эти требования действуют вместе с
-OMML-правилом, а не вместо него.
+Modules add punctuation rules on top of the mechanics: per ГОСТ 7.32,
+explanations follow immediately after the formula, "где" is written
+without a colon, the number sits in parentheses on the right as `(3.1)` or
+`(В.1)`, and the sign repeats at the start of the new line when a formula
+wraps. These requirements apply together with the OMML rule, not instead
+of it.
 
-## Единицы величин
+## Units of measurement
 
-Числа и единицы во всех типах документов подчиняются ГОСТ 8.417-2024:
-обозначение единицы — прямым шрифтом, между числом и единицей — пробел
-(`100 кВт`, `80 %`), точки после обозначения нет, регистр приставок значим —
-M и m, k и K различают величины. Величины в тексте и формулах набираются
-курсивом, единицы — прямым. Разбор случаев, диапазоны, температуру, угол и
-компьютерные величины ведёт `references/units-8.417.md`.
+Numbers and units in every document type follow ГОСТ 8.417-2024: unit
+symbols are set upright, a space separates the number and the unit (`100
+кВт`, `80 %`), no period follows the symbol, and prefix case matters — M
+and m, k and K denote different magnitudes. Quantities in text and formulas
+are set in italics, units upright. Edge cases, ranges, temperature, angles,
+and computing units are covered in `references/units-8.417.md`.
 
-## Библиография
+## Bibliography
 
-Библиографический аппарат держат три модуля: как ссылаться на источник в
-тексте — `references/references-7.0.5.md`; как записывать источник в списке
-литературы — `references/bibliography-records-7.0.100.md`; как ссылаться на
-сетевые документы — `references/web-references-7.0.108.md`. Для диссертации
-библиографический аппарат полностью живёт в
-`references/dissertation/04-bibliography.md`. Сокращения в ссылках — по
-ГОСТ Р 7.0.12, ГОСТ 7.11 и ГОСТ 7.12; отдельного модуля у них нет. Действие
-каждого стандарта сверяй по указателю «Национальные стандарты» на текущий год;
-пока статус не проверен, ставь NEEDS_SOURCE_CHECK и не объявляй требование
-действующим.
+The bibliographic apparatus spans three modules: how to cite a source in
+text — `references/references-7.0.5.md`; how to record a source in the
+reference list — `references/bibliography-records-7.0.100.md`; how to cite
+online sources — `references/web-references-7.0.108.md`. For a
+dissertation, the bibliographic apparatus lives entirely in
+`references/dissertation/04-bibliography.md`. Abbreviations in references
+follow ГОСТ Р 7.0.12, ГОСТ 7.11, and ГОСТ 7.12; these have no dedicated
+module. Check each standard's current status against the "National
+Standards" index for the current year; until status is verified, mark
+NEEDS_SOURCE_CHECK and don't declare the requirement in force.
 
-## Отчёт
+## Report
 
-Каждому пункту проверки присваивай статус PASS, FAIL, N/A или
-NEEDS_SOURCE_CHECK. Отчёт собирается из пяти разделов: критические
-несоответствия, технические несоответствия, библиографические вопросы,
-факультативные элементы, трассировка по пунктам стандарта. Если модуль задаёт
-собственный формат отчёта — `vkr.md` с разделами A–E, машинные чек-листы
-отдельных модулей — применяй формат модуля, сохраняя те же статусы.
+Assign every checklist point a status: PASS, FAIL, N/A, or
+NEEDS_SOURCE_CHECK. The report has five sections: critical
+non-conformities, technical non-conformities, bibliographic issues,
+optional elements, and traceability to standard clauses. If a module
+defines its own report format — `vkr.md` with sections A–E, or another
+module's machine checklist — use the module's format while keeping the
+same statuses.
 
-## Протокол расширения: новый тип документа
+## Extension protocol: a new document type
 
-1. Возьми у пользователя требования: методичку, стандарт, шаблон вуза или
-   готовый образец документа.
-2. Зафиксируй источник в шапке модуля: название, редакция, дата получения,
-   что источник не покрывает.
-3. Создай `references/<тип>.md`: структура документа, титульный лист, частные
-   значения полей, кеглей и интервалов, отличия от общего слоя шага 2.
-4. Механически проверяемые требования сведи в таблицу «требование — значение
-   в DOCX» по образцу шага 2.
-5. Добавь строку в таблицу маршрутизации шага 1 и, если модуль вводит новый
-   профиль значений, строку в таблицу профилей.
+1. Get the requirements from the user: a guideline, standard, university
+   template, or a finished sample document.
+2. Record the source in the module's header: title, edition, date
+   obtained, what the source doesn't cover.
+3. Create `references/<type>.md`: document structure, title page,
+   type-specific margin/font-size/spacing values, deviations from the
+   Step 2 shared layer.
+4. Compile mechanically checkable requirements into a "requirement — DOCX
+   value" table following the Step 2 pattern.
+5. Add a row to the Step 1 routing table, and to the profile table if the
+   module introduces a new value profile.
 
-Требование методички при расхождении с общим стандартом сильнее стандарта —
-так же, как для диссертации требования диссертационного совета сильнее ГОСТ
-(`references/dissertation.md`). Расхождение фиксируй в отчёте с обеими
-ссылками.
+A guideline's requirement outranks the general standard when they
+diverge — the same way a dissertation council's requirements outrank ГОСТ
+for a dissertation (`references/dissertation.md`). Record the divergence in
+the report with both references.
 
-## Границы
+## Boundaries
 
-Для типа без модуля скилл не выдумывает требования: пункт без источника
-получает NEEDS_SOURCE_CHECK.
+For a type without a module, the skill doesn't invent requirements: a
+point without a source gets NEEDS_SOURCE_CHECK.
 
-Модули — нормализованная рабочая интерпретация стандартов (версия
-2026-09-16) с трассировкой к исходным пунктам и официальными карточками
-protect.gost.ru в шапках. Правило скилла — OMML-математика и приоритет
-локальных требований — повторено в шапке каждого модуля и стоит выше
-содержимого модуля.
+Modules are a normalized working interpretation of the standards (version
+2026-09-16) with traceability to source clauses and official
+protect.gost.ru cards in their headers. The skill's core rule — OMML math
+and the priority of local requirements — is repeated in every module's
+header and takes precedence over the module's content.
