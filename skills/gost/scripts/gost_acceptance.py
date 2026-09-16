@@ -600,6 +600,64 @@ def main(argv: list[str] | None = None) -> int:
           "(w:tblHeader на первой строке)",
           not no_repeat_header, "; ".join(no_repeat_header[:3]))
 
+    # Выравнивание внутри таблицы — единообразно по столбцу: один и тот же
+    # столбец должен иметь одно и то же w:jc и один и тот же w:vAlign во всех
+    # строках. Таблицы со слиянием ячеек (gridSpan/vMerge) пропускаем — там
+    # позиционное сравнение столбцов не имеет смысла.
+    uneven_tables = []
+    implicit_mixed = []
+    for tbl in body.findall(f"{{{W}}}tbl"):
+        rows = tbl.findall(f"{{{W}}}tr")
+        if len(rows) < 2:
+            continue
+        has_merge = any(
+            tc.find(f"{{{W}}}tcPr/{{{W}}}gridSpan") is not None
+            or tc.find(f"{{{W}}}tcPr/{{{W}}}vMerge") is not None
+            for tr in rows for tc in tr.findall(f"{{{W}}}tc"))
+        if has_merge:
+            continue
+        data_rows = rows
+        if rows[0].find(f"{{{W}}}trPr/{{{W}}}tblHeader") is not None:
+            data_rows = rows[1:]
+        if len(data_rows) < 2:
+            continue
+        by_col: dict[int, set] = {}
+        has_math_col: dict[int, set] = {}
+        for tr in data_rows:
+            for ci, tc in enumerate(tr.findall(f"{{{W}}}tc")):
+                p0 = tc.find(f"{{{W}}}p")
+                jc = p0.find(f"{{{W}}}pPr/{{{W}}}jc") if p0 is not None else None
+                jc_val = jc.get(f"{{{W}}}val") if jc is not None else None
+                va = tc.find(f"{{{W}}}tcPr/{{{W}}}vAlign")
+                va_val = va.get(f"{{{W}}}val") if va is not None else None
+                by_col.setdefault(ci, set()).add((jc_val, va_val))
+                has_math_col.setdefault(ci, set()).add(bool(tc.findall(f".//{{{M}}}oMath")))
+        bad_cols = [ci for ci, combos in by_col.items() if len(combos) > 1]
+        # Столбец, где часть ячеек — объекты OMML, а часть — обычный текст, и
+        # ни одна ячейка не закрепляет w:vAlign явно: рендер по умолчанию у
+        # Word может визуально «гулять» построчно из-за разной высоты
+        # содержимого, хотя формальных атрибутов-нарушителей нет — это ровно
+        # тот дефект, что уже встречался в перечне условных обозначений.
+        risky_cols = [ci for ci, kinds in has_math_col.items()
+                     if len(kinds) > 1 and (None in {v for _, v in by_col[ci]})]
+        if bad_cols:
+            first = para_text(rows[0].findall(f"{{{W}}}tc")[0].find(f"{{{W}}}p")).strip()[:40] \
+                if rows[0].findall(f"{{{W}}}tc") else ""
+            uneven_tables.append(f"«{first}…»: столбцы {bad_cols}")
+        elif risky_cols:
+            first = para_text(rows[0].findall(f"{{{W}}}tc")[0].find(f"{{{W}}}p")).strip()[:40] \
+                if rows[0].findall(f"{{{W}}}tc") else ""
+            implicit_mixed.append(f"«{first}…»: столбцы {risky_cols}")
+    check(S_LAYOUT, GATE,
+          "выравнивание ячеек (по горизонтали и по высоте) одинаково по всей "
+          "таблице в пределах столбца",
+          not uneven_tables, "; ".join(uneven_tables[:4]))
+    check(S_LAYOUT, INFO,
+          "столбцы, где текст и формулы OMML соседствуют без явного "
+          "w:vAlign (риск визуального разнобоя по высоте — закрепи "
+          "vAlign=\"center\")",
+          not implicit_mixed, "; ".join(implicit_mixed[:4]))
+
     fig_below = fig_above = 0
     seen_drawing = False
     for node in body.iter():
@@ -666,8 +724,17 @@ def main(argv: list[str] | None = None) -> int:
                   if "TOC" in (t.text or "")]
     check(S_LAYOUT, GATE, "оглавление собрано полем TOC, а не статическим текстом",
           bool(toc_fields), "; ".join(toc_fields[:2]))
-    check(S_LAYOUT, INFO, "автообновление полей при открытии (w:updateFields)",
-          b"updateFields" in settings)
+    # w:updateFields=true не нужен для «TOC полем, не текстом» (см. проверку
+    # выше) и заставляет Word на каждое открытие показывать диалог «Документ
+    # содержит поля, которые могут ссылаться на другие файлы» — раздражает
+    # автора без всякой пользы, когда в документе только внутридокументные
+    # поля (TOC/PAGE/REF). layout-core.md, раздел 5.
+    forced_update = bool(re.search(rb'<w:updateFields\s+[^/]*w:val="(true|1|on)"',
+                                    settings))
+    check(S_LAYOUT, GATE,
+          "w:updateFields не установлен в true (не провоцирует диалог Word "
+          "«поля могут ссылаться на другие файлы» при открытии)",
+          not forced_update)
 
     # Стили TOC 1/TOC 2: унаследованный от Normal абзацный отступ или
     # выключка «по ширине» выталкивают перенесённую строку записи влево и

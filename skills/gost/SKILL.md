@@ -90,7 +90,14 @@ NEEDS_SOURCE_CHECK.
    compare `document.xml` values with the profile table. Reading only — the
    check never modifies the file.
 5. Content check: chain from the title through problem, aim, tasks, chapters,
-   method, results, conclusion; every claim traced to its evidence.
+   method, results, conclusion; every claim traced to its evidence. Also a
+   plain sanity pass while reading, no clause number attached: a table column
+   nobody explains, a value that doesn't add up, a sentence that reads as a
+   leftover from an earlier draft, a structural choice with no apparent
+   reason. Flag it as a question for the author even when it isn't a GOST
+   violation and even when it clearly predates this session's edits — the
+   point is to say what an attentive reader would notice, not just what's
+   mechanically checkable.
 6. Bibliographic apparatus: in-text references, list entries, online sources.
 7. Report.
 
