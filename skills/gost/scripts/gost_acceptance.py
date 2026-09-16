@@ -606,6 +606,7 @@ def main(argv: list[str] | None = None) -> int:
     # позиционное сравнение столбцов не имеет смысла.
     uneven_tables = []
     implicit_mixed = []
+    uneven_header = []
     for tbl in body.findall(f"{{{W}}}tbl"):
         rows = tbl.findall(f"{{{W}}}tr")
         if len(rows) < 2:
@@ -616,6 +617,29 @@ def main(argv: list[str] | None = None) -> int:
             for tr in rows for tc in tr.findall(f"{{{W}}}tc"))
         if has_merge:
             continue
+
+        # Разнобой ВНУТРИ шапки — другая ошибка, чем разнобой одного столбца
+        # по строкам: соседние ячейки первой строки с разным w:vAlign сразу
+        # видны на глаз, шапка «скачет» по высоте. Проверяем первую строку
+        # всегда, независимо от того, помечена ли она w:tblHeader.
+        #
+        # Наследуемое (не заданное явно) выравнивание тоже считается дефектом
+        # здесь, даже когда оно одинаково None у всех ячеек: на реальной
+        # таблице с частично пустыми ячейками шапки (группирующий заголовок
+        # над несколькими графами без настоящего gridSpan) явно одинаковое
+        # None всё равно визуально «скачет» — текст против пустых ячеек не
+        # держит общую базовую линию. Единственный надёжный вариант — явный
+        # одинаковый vAlign у каждой ячейки шапки, не унаследованный.
+        header_valigns = set()
+        for tc in rows[0].findall(f"{{{W}}}tc"):
+            va = tc.find(f"{{{W}}}tcPr/{{{W}}}vAlign")
+            header_valigns.add(va.get(f"{{{W}}}val") if va is not None else None)
+        if len(header_valigns) > 1 or None in header_valigns:
+            header_text = " / ".join(
+                para_text(tc.find(f"{{{W}}}p")).strip()[:15]
+                for tc in rows[0].findall(f"{{{W}}}tc")[:4])
+            uneven_header.append(f"«{header_text}»: {sorted(header_valigns, key=str)}")
+
         data_rows = rows
         if rows[0].find(f"{{{W}}}trPr/{{{W}}}tblHeader") is not None:
             data_rows = rows[1:]
@@ -657,6 +681,10 @@ def main(argv: list[str] | None = None) -> int:
           "w:vAlign (риск визуального разнобоя по высоте — закрепи "
           "vAlign=\"center\")",
           not implicit_mixed, "; ".join(implicit_mixed[:4]))
+    check(S_LAYOUT, GATE,
+          "у каждой ячейки шапки таблицы явно задан w:vAlign, и он "
+          "одинаков по всей строке",
+          not uneven_header, "; ".join(uneven_header[:4]))
 
     fig_below = fig_above = 0
     seen_drawing = False
