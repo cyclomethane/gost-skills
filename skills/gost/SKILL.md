@@ -94,7 +94,25 @@ NEEDS_SOURCE_CHECK.
 6. Bibliographic apparatus: in-text references, list entries, online sources.
 7. Report.
 
-## Step 3. Report
+## Step 3. Output scale — match the report to the ask
+
+Default to short and useful, not exhaustive. The full six-section report below
+is for an actual audit request or a `gost_acceptance.py` run — not for every
+mention of ГОСТ.
+
+- **Just connecting the skill, or a general ask** ("оформи по ГОСТ", "что тут
+  не так", a mention with no explicit audit request) → a short list of what's
+  missing or wrong, in plain language, ranked by impact. No clause numbers, no
+  six-section structure, no PASS/FAIL table for things that are fine.
+- **An explicit audit, review, or "проверь по ГОСТ" request, or the acceptance
+  script was run** → the full report below: all six sections, every status
+  (PASS/FAIL/N/A/NEEDS_SOURCE_CHECK), clause numbers throughout.
+- **Clause numbers and traceability** appear only when the user asked for
+  detail, for a formal audit, or the finding is a rejection risk (missing
+  mandatory element, structure). A quick recommendation doesn't need `[5.3.1]`
+  after every line.
+
+## Step 4. Report
 
 Six sections, in this order:
 

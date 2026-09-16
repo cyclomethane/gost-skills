@@ -15,8 +15,8 @@
   B — ГОСТ 7.32-2017: поля 30/15/20/20 мм, номер в центре нижней части листа.
 
 Значения профиля A, совпадающие с профилем B (поля 30/15, номер внизу),
-печатаются как DEVIATION — сознательное расхождение выверенной сборки, а не
-отказ; см. `references/layout-core.md`, раздел 15.
+печатаются как DEVIATION — сознательное расхождение, а не отказ; см.
+`references/layout-core.md`, раздел 15.
 
 Виды документа (`--type`) задают набор обязательных структурных элементов и
 элементов введения: dissertation, vkr, nir, generic.
@@ -42,6 +42,11 @@ import zipfile
 from pathlib import Path
 
 from lxml import etree
+
+# Консоль Windows по умолчанию открывает stdout в cp1251/cp866: символы вроде
+# «≈» в отчёте валят печать UnicodeEncodeError. Отчёт всегда должен напечататься.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 M = "http://schemas.openxmlformats.org/officeDocument/2006/math"
@@ -206,6 +211,8 @@ def main(argv: list[str] | None = None) -> int:
         return st.get(f"{{{W}}}val") if st is not None else ""
 
     heads1 = [p for p in paras if style_of(p) == "Heading1"]
+    heads_all = [p for p in paras
+                 if style_of(p) in ("Heading1", "Heading2", "Heading3", "Heading4")]
     head_texts = [para_text(p).strip() for p in heads1]
     head_upper = [t.upper() for t in head_texts]
     all_text = "\n".join(para_text(p) for p in paras)
@@ -426,6 +433,46 @@ def main(argv: list[str] | None = None) -> int:
           f"заголовки набраны {args.font} без темевой подмены",
           not bad_fonts, "; ".join(bad_fonts))
 
+    # Стиль Heading может ссылаться на rFonts, но если у него нет собственной
+    # записи, реальный шрифт берётся из w:docDefaults — там же живёт тема
+    # Calibri, которую python-docx подставляет по умолчанию.
+    doc_defaults_rf = styles.find(
+        f"{{{W}}}docDefaults/{{{W}}}rPrDefault/{{{W}}}rPr/{{{W}}}rFonts")
+    if doc_defaults_rf is not None:
+        dd_theme = sorted(a.split("}")[1] for a in doc_defaults_rf.attrib
+                          if a.endswith("Theme"))
+        dd_ascii = doc_defaults_rf.get(f"{{{W}}}ascii")
+        check(S_LAYOUT, GATE,
+              f"шрифт по умолчанию пакета (w:docDefaults) — {args.font} без темы",
+              not dd_theme and dd_ascii == args.font,
+              f"ascii={dd_ascii}, темевые={','.join(dd_theme) or 'нет'}")
+    else:
+        check(S_LAYOUT, INFO, "w:docDefaults не переопределяет шрифт", True)
+
+    # Прямое форматирование прогона всегда сильнее стиля: если сборщик (или
+    # человек в Word) точечно поставил Calibri/темевой шрифт на текст самого
+    # заголовка, проверка стиля Heading1–4 этого не увидит. Смотрим каждый
+    # прогон каждого заголовка отдельно — это и есть тот случай, на котором
+    # скилл уже дважды ошибался (заголовки Calibri в статье и в диссертации).
+    bad_direct = []
+    for p in heads_all:
+        lvl = style_of(p)
+        for r in p.findall(f"{{{W}}}r"):
+            rPr = r.find(f"{{{W}}}rPr")
+            rf = rPr.find(f"{{{W}}}rFonts") if rPr is not None else None
+            if rf is None:
+                continue
+            theme = sorted(a.split("}")[1] for a in rf.attrib if a.endswith("Theme"))
+            ascii_f = rf.get(f"{{{W}}}ascii")
+            if theme or (ascii_f and ascii_f != args.font):
+                txt = "".join(t.text or "" for t in r.iter(f"{{{W}}}t")).strip()
+                bad_direct.append(f"{lvl} «{txt[:30]}»: ascii={ascii_f}, "
+                                  f"темевые={','.join(theme) or 'нет'}")
+    check(S_LAYOUT, GATE,
+          "в тексте заголовков нет прямого форматирования шрифтом "
+          f"мимо {args.font} (Calibri темой в т.ч.)",
+          not bad_direct, "; ".join(bad_direct[:4]))
+
     h1 = None
     for st in styles.findall(f"{{{W}}}style"):
         if st.get(f"{{{W}}}styleId") == "Heading1":
@@ -458,6 +505,23 @@ def main(argv: list[str] | None = None) -> int:
           f"разрыв в стиле Heading1: {style_break}; собственных разрывов "
           f"{own_break} из {len(heads1)}")
 
+    # Ручной разрыв страницы в пустом абзаце вместо pageBreakBefore в стиле —
+    # типичный дефект вёрстки (layout-core.md, п. 14): создаёт пустые страницы
+    # и ломается при правке текста выше. Пустой абзац с разрывом легален,
+    # только если сразу за ним идёт заголовок первого уровня.
+    stray_breaks = []
+    for idx, p in enumerate(paras):
+        if not p.findall(f".//{{{W}}}br[@{{{W}}}type='page']"):
+            continue
+        if style_of(p) == "Heading1":
+            continue  # разрыв внутри самого заголовка уже учтён выше
+        next_head = idx + 1 < len(paras) and style_of(paras[idx + 1]) == "Heading1"
+        if para_text(p).strip() or not next_head:
+            stray_breaks.append(f"параграф {idx}: «{para_text(p).strip()[:40]}»")
+    check(S_LAYOUT, GATE,
+          "нет ручных разрывов страницы вне пустого абзаца перед заголовком",
+          not stray_breaks, "; ".join(stray_breaks[:4]))
+
     # Подписи рисунков и таблиц
     loose_fig = [para_text(p).strip() for p in paras
                  if para_text(p).strip().startswith("Рисунок ")]
@@ -489,6 +553,8 @@ def main(argv: list[str] | None = None) -> int:
     children = list(body)
     content_tables = captioned = 0
     bad_tbl, exempt = [], []
+    TALL_TABLE_ROWS = 8  # эвристика: с такого числа строк таблица обычно переходит на следующую страницу
+    no_repeat_header = []
     current_head = ""
     for idx, node in enumerate(children):
         tag = etree.QName(node).localname
@@ -518,11 +584,21 @@ def main(argv: list[str] | None = None) -> int:
             captioned += 1
         else:
             bad_tbl.append(prev[:70] or "(над таблицей нет текста)")
+        if len(rows) >= TALL_TABLE_ROWS:
+            trPr = rows[0].find(f"{{{W}}}trPr")
+            header = trPr.find(f"{{{W}}}tblHeader") if trPr is not None else None
+            repeats = header is not None and header.get(f"{{{W}}}val") != "0"
+            if not repeats:
+                no_repeat_header.append(f"{prev[:60] or '(без надписи)'} ({len(rows)} строк)")
     check(S_LAYOUT, GATE, "над каждой таблицей стоит надпись «Таблица N — Название»",
           not bad_tbl, f"таблиц {content_tables}, с надписью {captioned}, "
                        f"без надписи {len(bad_tbl)}: " + "; ".join(bad_tbl[:3]))
     check(S_LAYOUT, INFO, "перечни, свёрстанные таблицей и не требующие номера",
           True, f"{len(exempt)}: " + "; ".join(exempt))
+    check(S_LAYOUT, GATE,
+          f"шапка повторяется на следующей странице у таблиц от {TALL_TABLE_ROWS} строк "
+          "(w:tblHeader на первой строке)",
+          not no_repeat_header, "; ".join(no_repeat_header[:3]))
 
     fig_below = fig_above = 0
     seen_drawing = False
@@ -592,6 +668,32 @@ def main(argv: list[str] | None = None) -> int:
           bool(toc_fields), "; ".join(toc_fields[:2]))
     check(S_LAYOUT, INFO, "автообновление полей при открытии (w:updateFields)",
           b"updateFields" in settings)
+
+    # Стили TOC 1/TOC 2: унаследованный от Normal абзацный отступ или
+    # выключка «по ширине» выталкивают перенесённую строку записи влево и
+    # отрывают номер страницы от текста заголовка.
+    bad_toc_style = []
+    toc_style_found = False
+    for st in styles.findall(f"{{{W}}}style"):
+        sid = (st.get(f"{{{W}}}styleId") or "").replace(" ", "").lower()
+        if sid not in ("toc1", "toc2"):
+            continue
+        toc_style_found = True
+        pPr = st.find(f"{{{W}}}pPr")
+        ind = pPr.find(f"{{{W}}}ind") if pPr is not None else None
+        jc = pPr.find(f"{{{W}}}jc") if pPr is not None else None
+        fl = int(ind.get(f"{{{W}}}firstLine", "0")) if ind is not None else 0
+        jc_val = jc.get(f"{{{W}}}val") if jc is not None else None
+        if fl != 0 or jc_val in ("both", "center"):
+            bad_toc_style.append(f"{st.get(f'{{{W}}}styleId')}: отступ {fl}, "
+                                 f"выравнивание {jc_val or 'наследует'}")
+    if toc_style_found:
+        check(S_LAYOUT, GATE,
+              "стили TOC 1/TOC 2 без абзацного отступа и без выключки по ширине",
+              not bad_toc_style, "; ".join(bad_toc_style))
+    else:
+        check(S_LAYOUT, INFO, "стили TOC 1/TOC 2 не переопределены (стандартные Word)",
+              True)
 
     def starts_new_page(p) -> bool:
         if p.find(f"{{{W}}}pPr/{{{W}}}pageBreakBefore") is not None:
